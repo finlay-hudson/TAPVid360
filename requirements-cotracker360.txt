@@ -1,0 +1,7 @@
+# cotracker360
+git+https://github.com/facebookresearch/co-tracker
+roma==1.5.2
+
+# For training
+matplotlib
+opencv-python
