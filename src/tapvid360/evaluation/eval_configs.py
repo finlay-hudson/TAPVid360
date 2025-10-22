@@ -6,9 +6,10 @@ from pathlib import Path
 class TAPVid360EvalConfig:
     results_dir: Path = Path("results")  # Path to store run through model predictions
     metrics_out_root: Path = Path("metrics")  # Path to store computed metrics
-    data_dir: Path = Path("data")  # Parent of the /dataset folder of tapvid360
+    data_dir: Path = Path("data/TAPVid360-10k")  # Parent of the /dataset folder of tapvid360
     trained_model_path: Path = Path(
         "checkpoints/cotracker360.pth")  # Path to the checkpoint file, if using cotracker360
+    method_name: str = "cotracker360"
 
 
 class CoTracker360EvalConfig:

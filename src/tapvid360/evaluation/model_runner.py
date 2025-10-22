@@ -23,7 +23,7 @@ def _get_tapvid360_mapper(eq_hs, w, h, fov_xs):
 
 @torch.no_grad()
 def main(device, cotracker360_config, tapvid360_config):
-    dataset = TAPVid360Dataset(tapvid360_config.data_dir, get_transform((240, 320)))
+    dataset = TAPVid360Dataset(tapvid360_config.data_dir, get_transform(cotracker360_config.model_resolution))
 
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=cotracker360_config.batch_size, shuffle=False,
                                              num_workers=cotracker360_config.num_workers, collate_fn=collate_fn)
@@ -37,7 +37,7 @@ def main(device, cotracker360_config, tapvid360_config):
     tapvid360_config.results_dir.mkdir(parents=True, exist_ok=True)
 
     tapvid360_config.metrics_out_root.mkdir(exist_ok=True)
-    metrics_out_path = tapvid360_config.metrics_out_root / tapvid360_config.data_dir.stem / "cotracker360"
+    metrics_out_path = tapvid360_config.metrics_out_root / tapvid360_config.data_dir.stem / tapvid360_config.method_name
     metrics_out_path.mkdir(exist_ok=True, parents=True)
 
     for i, sample in enumerate(tqdm(dataloader)):
