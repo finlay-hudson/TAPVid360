@@ -3,11 +3,11 @@ from tqdm import tqdm
 import torch
 
 from src.tapvid360.common.conversions.mapper import Mappers
+from src.tapvid360.common.model.cotracker360 import CoTracker360
 from src.tapvid360.evaluation.data.data_utils import get_transform, collate_fn
 from src.tapvid360.evaluation.data.eval_dataloader import TAPVid360Dataset
 from src.tapvid360.evaluation.eval_configs import CoTracker360EvalConfig, TAPVid360EvalConfig
 from src.tapvid360.evaluation.metrics.metrics_utils import gen_metrics_and_dump
-from src.tapvid360.evaluation.model.cotracker360 import CoTracker360
 
 
 def _make_query_points_for_cotracker(gt_unit_vectors, perspective_points):

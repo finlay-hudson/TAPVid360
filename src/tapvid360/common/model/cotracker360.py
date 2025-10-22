@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from cotracker.models.core.cotracker.cotracker import EfficientUpdateFormer
 from cotracker.models.core.cotracker.cotracker3_online import CoTrackerThreeBase, posenc
 
-from src.tapvid360.training.utils import CheckpointSaver
+from src.tapvid360.common.model.utils import CheckpointSaver
 
 torch.manual_seed(0)
 
