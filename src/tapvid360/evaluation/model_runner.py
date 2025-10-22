@@ -17,31 +17,6 @@ def _make_query_points_for_cotracker(gt_unit_vectors, perspective_points):
     return [torch.cat([torch.zeros_like(init_unit_vector[..., 0:1]), init_unit_vector], dim=-1), init_persp_point]
 
 
-def get_avg_for_cat_metrics(video_metrics_list):
-    metrics = {
-        'average_pts_within_all': [],
-        'average_pts_within_in_frame': [],
-        'average_pts_within_out_of_frame': [],
-        'angular_dists_all': [],
-        'angular_dists_in_frame': [],
-        'angular_dists_out_of_frame': [],
-    }
-
-    # Aggregate tensors from each video
-    for video_metrics in video_metrics_list:
-        for key in metrics:
-            metrics[key].append(video_metrics[key])
-
-    # Compute average per metric
-    averaged_metrics = {}
-    for key, tensor_list in metrics.items():
-        stacked = torch.hstack(metrics[key])
-        std = stacked.std().item()
-        averaged_metrics[key] = {"mean": stacked.mean().item(), "std": std}
-
-    return averaged_metrics
-
-
 def _get_tapvid360_mapper(eq_hs, w, h, fov_xs):
     return [Mappers(w, h, equirectangular_height=eq_h, fov_x=75.18) for eq_h, fov_x in zip(eq_hs, fov_xs)]
 
@@ -52,10 +27,6 @@ def main(device, cotracker360_config, tapvid360_config):
 
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=cotracker360_config.batch_size, shuffle=False,
                                              num_workers=cotracker360_config.num_workers, collate_fn=collate_fn)
-    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=cotracker360_config.batch_size, shuffle=False,
-    #                                          num_workers=2, collate_fn=collate_fn)
-    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False,
-    #                                          num_workers=0, collate_fn=collate_fn)
 
     model = CoTracker360(stride=cotracker360_config.stride, corr_radius=cotracker360_config.corr_radius,
                          window_len=cotracker360_config.window_len,
