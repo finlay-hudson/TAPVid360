@@ -34,7 +34,8 @@ def main(device, cotracker360_config, tapvid360_config):
     model.load_weights(tapvid360_config.trained_model_path, strict=True)
     model.eval()
 
-    tapvid360_config.results_dir.mkdir(parents=True, exist_ok=True)
+    method_results_dir = tapvid360_config.results_dir / tapvid360_config.method_name
+    method_results_dir.mkdir(parents=True, exist_ok=True)
 
     tapvid360_config.metrics_out_root.mkdir(exist_ok=True)
     metrics_out_path = tapvid360_config.metrics_out_root / tapvid360_config.data_dir.stem / tapvid360_config.method_name
@@ -53,7 +54,7 @@ def main(device, cotracker360_config, tapvid360_config):
         # dump results
         for b, seq_name in enumerate(sample.seq_name):
             save_seq_name = seq_name.replace("/", "-")  # avoid creating subfolders
-            torch.save(coord_preds[b].cpu(), tapvid360_config.results_dir / f"{save_seq_name}.pth")
+            torch.save(coord_preds[b].cpu(), method_results_dir/ f"{save_seq_name}.pth")
         gen_metrics_and_dump(coord_preds.cpu(), sample, metrics_out_path)
 
 
