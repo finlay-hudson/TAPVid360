@@ -1,4 +1,13 @@
-# TAPVid360 
+# TAPVid-360: Tracking Any Point in 360 from Narrow Field of View Video
+
+**NeurIPS 2025 (Datasets & Benchmarks Track)**
+
+[Finlay G. C. Hudson](https://finlay-hudson.github.io/), [James A. D. Gardner](https://jadgardner.github.io/), [William A. P. Smith](https://www-users.york.ac.uk/~waps101/) — University of York
+
+[[Paper (arXiv:2511.21946)](https://arxiv.org/abs/2511.21946)] [[Project page](https://finlay-hudson.github.io/tapvid360/)] [[TAPVid360-10k dataset](https://huggingface.co/datasets/fhudson96/TAPVid360-10k)] [[CoTracker360 weights](https://huggingface.co/fhudson96/cotracker360)]
+
+Given a narrow field-of-view video and query points in the first frame, TAPVid-360 asks for the 3D direction to each point in every frame, even after it leaves the camera's view. This repository contains the TAPVid360-10k evaluation code and the CoTracker360 baseline.
+
 
 ## Setup
 Create a virtual environment and install the dependencies:
@@ -75,3 +84,19 @@ Coming soon...
 - vc: unit vectors in camera coordinate system of shape *,3 (this is what the coords in the dataset are represented in)
 - ij: perspective pixel coordinates of shape *, 2
 
+## Citation
+
+```bibtex
+@inproceedings{hudson2025tapvid,
+  title         = {{TAPVid-360}: Tracking Any Point in 360 from Narrow Field of View Video},
+  author        = {Hudson, Finlay G. C. and Gardner, James A. D. and Smith, William A. P.},
+  booktitle     = {The Thirty-ninth Annual Conference on Neural Information Processing Systems Datasets and Benchmarks Track},
+  year          = {2025},
+  eprint        = {2511.21946},
+  archivePrefix = {arXiv}
+}
+```
+
+## License
+
+The code is MIT — see [LICENSE](LICENSE). The [TAPVid360-10k dataset](https://huggingface.co/datasets/fhudson96/TAPVid360-10k) and the [CoTracker360 weights](https://huggingface.co/fhudson96/cotracker360) (derived from CoTracker3) are CC BY-NC 4.0.
