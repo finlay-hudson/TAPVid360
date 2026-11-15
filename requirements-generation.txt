@@ -1,0 +1,21 @@
+# Data generation (src/tapvid360/data_generation). Install on top of requirements.txt and requirements-cotracker360.txt.
+# Also needs the ffmpeg/ffprobe command-line tools on PATH.
+# Pinned versions follow the environment TAPVid360-10k was generated in, except yt-dlp, which must be recent.
+
+# Stage 1: download + filtering
+yt-dlp  # keep up to date (pip install -U yt-dlp): old versions are blocked by YouTube
+av==15.0.0
+lpips==0.1.4
+scenedetect==0.6.6
+timm==1.0.19
+huggingface_hub==0.34.3
+pandas==2.3.1
+pyarrow==21.0.0
+opencv-python==4.11.0.86
+numpy==2.2.5
+wandb  # optional, --wandb
+
+# Stage 2: tracks (Grounding DINO via transformers + SAM 2; CoTracker3 is loaded through torch.hub)
+git+https://github.com/facebookresearch/sam2@2b90b9f5ceec907a1c18123530e92e794ad901a4
+transformers==4.54.1
+decord==0.6.0

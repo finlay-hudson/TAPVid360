@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+
+# Data, model weights and generated outputs (see README)
+data/
+checkpoints/
+outputs/
+results/
