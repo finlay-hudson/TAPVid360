@@ -80,8 +80,10 @@ Downloads 360-1M videos (with at least 15 likes) and filters them as described i
 
 ```
 PYTHONPATH=. python src/tapvid360/data_generation/download/main.py \
-    --metadata path/to/360-1M.parquet --out_dir outputs/download
+    --metadata data/360-1M.parquet --out_dir outputs/download
 ```
+
+The metadata file is [`360-1M.parquet`](https://huggingface.co/datasets/mwallingford/360-1M/resolve/main/360-1M.parquet) from the [360-1M dataset](https://huggingface.co/datasets/mwallingford/360-1M) (about 1.1M video IDs; only the `id` and `like_count` columns are used).
 
 Clips are written to `outputs/download/<run>/filtered_clips/<video_id>/<video_id>_clip_NNNN.mp4`. Runs can be resumed with `--resume_dir outputs/download/<run>`. Downloads go through `yt-dlp`; pass `--cookies` if YouTube rate-limits you.
 
@@ -93,7 +95,7 @@ PYTHONPATH=. python src/tapvid360/data_generation/tracks/main.py \
     --clips_dir outputs/download/<run>/filtered_clips --out_dir outputs/tracks_360
 ```
 
-When generating training data, pass `--exclude_list` (a JSON list of TAPVid360-10k sample names such as `"-0r64Y3PCTQ_clip_0000/0"`) so that no evaluation clip is reused.
+When generating training data, pass `--exclude_list data/TAPVid360-10k` (the dataset root, or a JSON list of sample names such as `"-0r64Y3PCTQ_clip_0000/0"`) so that no TAPVid360-10k clip is reused. As for the released model, only those clips are excluded; other clips of the same videos can still be used. Stage 2 takes about 15 s per clip on an NVIDIA A40.
 
 ### 3. Manual review (`review/`)
 Every object track in TAPVid360-10k was checked by hand. This tool plays each track on the equirectangular video or in an object-centred view. Press `A` to accept a track or `R` to reject it; decisions are saved to `outputs/tracks_360_manual_checking/`.

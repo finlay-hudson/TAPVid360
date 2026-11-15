@@ -272,11 +272,18 @@ def list_clips(clips_dir: Path, clip_list: Path | None, exclude_list: Path | Non
         if not (clips_dir / clip).exists():
             raise FileNotFoundError(f"Missing clip: {clips_dir / clip}")
     if exclude_list is not None:
-        # JSON list of "<clip name>/<object idx>" entries, e.g. the TAPVid360-10k sample names.
-        with open(exclude_list) as f:
-            excluded = {Path(name).parent.name for name in json.load(f)}
+        excluded = excluded_clip_names(exclude_list)
         clips = [c for c in clips if c.stem not in excluded]
     return clips
+
+
+def excluded_clip_names(exclude: Path) -> set[str]:
+    """Clip names to skip: from a TAPVid360 dataset root (containing dataset/<clip>/<idx>/) or a JSON list of
+    "<clip>/<idx>" sample names. As for TAPVid360-10k, only those clips are excluded, not their whole videos."""
+    if exclude.is_dir():
+        return {p.name for p in (exclude / "dataset").iterdir() if p.is_dir()}
+    with open(exclude) as f:
+        return {Path(name).parent.name for name in json.load(f)}
 
 
 def main(args):
@@ -343,8 +350,8 @@ if __name__ == "__main__":
     parser.add_argument("--clip_list", type=Path, default=None,
                         help="Optional JSON list of clip paths (relative to --clips_dir) to process.")
     parser.add_argument("--exclude_list", type=Path, default=None,
-                        help="Optional JSON list of '<clip>/<idx>' names whose clips are skipped "
-                             "(e.g. the TAPVid360-10k samples, when generating training data).")
+                        help="Clips to skip when generating training data: a TAPVid360 dataset root such as "
+                             "data/TAPVid360-10k, or a JSON list of '<clip>/<idx>' sample names.")
     parser.add_argument("--sam_checkpoint", type=Path, default=TrackGenConfig.sam_checkpoint)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     main(parser.parse_args())
