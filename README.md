@@ -10,7 +10,7 @@ Given a narrow field-of-view video and query points in the first frame, TAPVid-3
 
 
 ## Setup
-Create a virtual environment and install the dependencies:
+Create a virtual environment (Python 3.10 or newer) and install the dependencies:
 
 ```
 pip install -r requirements.txt
@@ -22,8 +22,9 @@ pip install -r requirements-cotracker360.txt
 ```
 
 ## [Data](https://huggingface.co/datasets/fhudson96/TAPVid360-10k)
-To download the TAPVid360-10k dataset, use the following commands:
+To download the TAPVid360-10k dataset into `data/`, use the following commands:
 ```
+mkdir -p data && cd data
 git lfs install
 git clone https://huggingface.co/datasets/fhudson96/TAPVid360-10k
 cd TAPVid360-10k
@@ -68,7 +69,7 @@ The pipeline that built TAPVid360-10k from [360-1M](https://github.com/MattWalli
 pip install -r requirements-cotracker360.txt -r requirements-generation.txt
 ```
 
-Grounding DINO weights (via Lang-SAM), the LAION watermark detector and CoTracker3 (via `torch.hub`) download automatically. SAM 2 needs its Hiera-L checkpoint:
+Grounding DINO weights (via Hugging Face `transformers`), the LAION watermark detector and CoTracker3 (via `torch.hub`) download automatically. SAM 2 needs its Hiera-L checkpoint:
 
 ```
 mkdir -p checkpoints/sam2
@@ -79,6 +80,7 @@ wget -P checkpoints/sam2 https://dl.fbaipublicfiles.com/segment_anything_2/07282
 Downloads 360-1M videos (with at least 15 likes) and filters them as described in the paper. Coarse checks run on the full video: equirectangular metadata, borders, upside-down video, a visible seam, near-duplicate frames (LPIPS) and too little motion. The video is then split into 10-second clips, and each clip is checked for low optical flow, scene cuts and watermarks.
 
 ```
+wget -P data https://huggingface.co/datasets/mwallingford/360-1M/resolve/main/360-1M.parquet
 PYTHONPATH=. python src/tapvid360/data_generation/download/main.py \
     --metadata data/360-1M.parquet --out_dir outputs/download
 ```
