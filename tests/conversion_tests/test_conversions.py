@@ -203,7 +203,7 @@ def test_round_trip_CR_IJ_CR(config, dummy_cr_centre, R_w2c):
 
 
 @pytest.mark.xfail
-def test_round_trip_CR_IJ_CR(config, dummy_cr, R_w2c):
+def test_round_trip_CR_IJ_CR_uncentred(config, dummy_cr, R_w2c):
     # This test fails as the CR with the identity rotation leads to the pixel being outside of the frame. So we need
     # guardrails around that # TODO
     converter = Conversions(config)

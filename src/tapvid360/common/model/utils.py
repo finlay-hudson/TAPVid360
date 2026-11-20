@@ -23,7 +23,7 @@ class CheckpointSaver:
             torch.save(model_out_dict, self.out_root / "checkpoint_best.pth")
         torch.save(model_out_dict, self.out_root / "checkpoint_last.pth")
         if save_epoch_number:
-            torch.save(model_out_dict, get_epoch_out_dir(self.out_root, current_epoch) / f"checkpoint.pth")
+            torch.save(model_out_dict, get_epoch_out_dir(self.out_root, current_epoch) / "checkpoint.pth")
         with open(self.out_root / "checkpoint_info.txt", 'w') as file:
             # Write two lines to the file
             file.write(f'Best Epoch: {self.best_epoch}\n')
