@@ -2,7 +2,8 @@
 
 Based on Lang-SAM (https://github.com/luca-medeiros/lang-segment-anything, Apache-2.0), which TAPVid360-10k was
 generated with; its Grounding DINO wrapper is reproduced here so the package (which pins old torch versions and
-Python >= 3.11) is not needed.
+Python >= 3.11) is not needed. `_run_sam` follows SAM 2's SAM2ImagePredictor (https://github.com/facebookresearch/sam2,
+Apache-2.0).
 """
 from typing import Optional
 

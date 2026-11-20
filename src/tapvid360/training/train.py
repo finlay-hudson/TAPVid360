@@ -10,7 +10,8 @@ Example:
         --cotracker3_checkpoint checkpoints/scaled_offline.pth --out_dir outputs/training/cotracker360
 
 Checkpoints (`checkpoint_last.pth`, `checkpoint_best.pth`, `epoch_<n>/checkpoint.pth`) load directly with
-`CoTracker360.load_weights` (and so with the evaluation code).
+`CoTracker360.load_weights` (and so with the evaluation code). The optimizer state is saved alongside
+(`optimizer_last.pth`) so that `--resume` continues the run exactly.
 """
 import argparse
 import json
@@ -34,6 +35,7 @@ CORR_RADIUS = 3
 WINDOW_LEN = 60
 # Replaced so the decoder predicts a rotation per point and frame.
 REINITIALISED_LAYERS = ["updateformer.flow_head.weight", "updateformer.flow_head.bias"]
+OPTIMIZER_CHECKPOINT = "optimizer_last.pth"
 
 
 def forward(model, batch, device, num_iters):
@@ -107,6 +109,15 @@ def main(args):
         model.load_weights(args.out_dir / "checkpoint_last.pth", strict=True)
         losses, dists = checkpoint["extras"]["losses"], checkpoint["extras"]["dists"]
         start_epoch = checkpoint["epoch"] + 1
+        # So the first save after resuming only replaces checkpoint_best.pth if the new epoch is better.
+        val_epochs = list(dists["val"].keys())
+        if val_epochs:
+            mean_dists = torch.stack(list(dists["val"].values())).mean(axis=[1, 2, 3])
+            checkpointer.best_epoch = val_epochs[mean_dists.argmin()] + 1  # Same numbering as CheckpointSaver.
+        if (args.out_dir / OPTIMIZER_CHECKPOINT).exists():
+            optimizer.load_state_dict(torch.load(args.out_dir / OPTIMIZER_CHECKPOINT, map_location=device))
+        else:
+            print(f"Warning: no {OPTIMIZER_CHECKPOINT} found; resuming with a fresh optimizer state.")
         print(f"Resuming from epoch {start_epoch}")
     with open(args.out_dir / "args.json", "w") as f:
         json.dump({k: str(v) for k, v in vars(args).items()}, f, indent=2)
@@ -120,6 +131,7 @@ def main(args):
             dists["val"][epoch] = validate(model, val_loader, device, args.num_iters, epoch)
             print(f"Epoch {epoch}: mean val angular error {dists['val'][epoch].mean():.4f} deg")
             model.save_checkpoint(checkpointer, epoch, dists, losses)
+            torch.save(optimizer.state_dict(), args.out_dir / OPTIMIZER_CHECKPOINT)
 
 
 if __name__ == "__main__":

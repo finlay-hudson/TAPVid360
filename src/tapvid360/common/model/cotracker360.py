@@ -1,4 +1,6 @@
 # Modified from https://github.com/facebookresearch/co-tracker/blob/main/cotracker/models/core/cotracker/cotracker3_offline.py
+# Copyright (c) Meta Platforms, Inc. and affiliates. CoTracker is licensed under CC BY-NC 4.0
+# (https://creativecommons.org/licenses/by-nc/4.0/), so this file is too, not MIT like the rest of the repository.
 
 import roma
 
@@ -94,6 +96,9 @@ class CoTracker360(CoTrackerThreeBase):
 
         assert T >= 1  # A tracker needs at least two frames to track something
 
+        # NB: TAPVid360Dataset already gives frames in [0, 1] (torchvision ToTensor), so this second division by 255
+        # leaves the model inputs in roughly [-1, -0.99] rather than [-1, 1]. CoTracker360 was trained (and the released
+        # weights evaluated) with exactly this input path, so it is kept as is: changing it would break the weights.
         video = 2 * (video / 255.0) - 1.0
         dtype = video.dtype
         queried_frames = queries_uv[:, :, 0].long()

@@ -1,4 +1,8 @@
-"""SAM2 helpers. The video predictor is patched to take frames from memory instead of a directory of JPEGs."""
+"""SAM2 helpers. The video predictor is patched to take frames from memory instead of a directory of JPEGs.
+
+The patched functions are adapted from SAM 2 (https://github.com/facebookresearch/sam2), Copyright (c) Meta Platforms,
+Inc. and affiliates, licensed under the Apache License 2.0.
+"""
 import types
 from collections import OrderedDict
 from pathlib import Path
