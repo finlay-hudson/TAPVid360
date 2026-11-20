@@ -74,3 +74,32 @@ def aggregate_metrics(metrics_dir: Path):
         print(f"  - Std Dev of video means: {std_of_means:.4f}")
 
     return final_results
+
+
+def aggregate_metrics_by_camera_method(metrics_dir: Path, dataset_dir: Path):
+    """Mean of each metric per camera method (as in Table 4 of the paper), read from each sample's gen_info.txt.
+
+    Args:
+        metrics_dir: Directory of `<clip>-<idx>_metrics.json` files.
+        dataset_dir: The dataset/ directory of TAPVid360-10k (containing <clip>/<idx>/gen_info.txt).
+    """
+    per_method = defaultdict(lambda: defaultdict(list))
+    for file_path in metrics_dir.glob('**/*_metrics.json'):
+        clip, idx = file_path.name[:-len('_metrics.json')].rsplit('-', 1)
+        gen_info = dataset_dir / clip / idx / 'gen_info.txt'
+        if not gen_info.exists():
+            continue
+        method = gen_info.read_text().split(':', 1)[1].strip()
+        with open(file_path) as f:
+            for metric_name, value in json.load(f).items():
+                if value is not None:
+                    per_method[method][metric_name].append(value)
+
+    print("\n--- Metrics per camera method ---")
+    final_results = {}
+    for method in sorted(per_method):
+        final_results[method] = {m: float(np.nanmean(v)) for m, v in per_method[method].items()}
+        n_samples = max(len(v) for v in per_method[method].values())
+        values = ", ".join(f"{m}: {v:.4f}" for m, v in final_results[method].items())
+        print(f"{method} ({n_samples} samples): {values}")
+    return final_results

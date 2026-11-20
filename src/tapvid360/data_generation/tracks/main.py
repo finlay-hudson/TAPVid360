@@ -32,9 +32,12 @@ from src.tapvid360.data_generation.tracks.mask_utils import (compute_center_of_m
                                                              find_points_in_masks, get_distributed_points)
 from src.tapvid360.data_generation.tracks.sam2_video import get_sam2_predictor, run_through_sam_video
 from src.tapvid360.data_generation.video_utils import (EQ_HEIGHT, EQ_WIDTH, EquirectangularVideoReader,
-                                                       encode_frames_to_video_bytes)
+                                                       count_frames_pyav, encode_frames_to_video_bytes,
+                                                       read_frames_pyav)
 
 logger = logging.getLogger(__name__)
+
+NO_TRACKS_FILE = "clips_without_tracks.txt"  # In --out_dir: clips where no object survived the filters.
 
 
 # --- Loading clips ---------------------------------------------------------------------------------------------------
@@ -49,13 +52,26 @@ def best_downsample_rate(num_frames: int, ideal_rate: int, min_required_frames: 
 
 def load_clip(clip_path: Path, config: TrackGenConfig):
     """Sample `config.max_frames` frames from a clip. Returns (clip_path, frames, frame_idxs) or None."""
-    reader = EquirectangularVideoReader(clip_path)
-    ds_rate = best_downsample_rate(reader.count_frames(), config.downsample_rate, config.max_frames)
-    if ds_rate is None:
-        return None
-    frame_idxs = [(i * ds_rate) + config.start_frame for i in range(config.max_frames)]
     try:
-        frames = reader.load_frames(frame_idxs)
+        reader = EquirectangularVideoReader(clip_path)
+        num_frames = reader.count_frames()
+    except Exception:
+        reader, num_frames = None, None
+    try:
+        if num_frames is None:
+            num_frames = count_frames_pyav(clip_path)
+        ds_rate = best_downsample_rate(num_frames, config.downsample_rate, config.max_frames)
+        if ds_rate is None:
+            logger.warning(f"Skipping {clip_path}: {num_frames} frames is fewer than {config.max_frames}")
+            return None
+        frame_idxs = [(i * ds_rate) + config.start_frame for i in range(config.max_frames)]
+        try:
+            if reader is None:
+                raise RuntimeError("decord could not open the clip")
+            frames = reader.load_frames(frame_idxs)
+        except Exception:
+            # decord cannot decode some codecs (e.g. YouTube's 4K VP9, which yt-dlp now often downloads); use PyAV.
+            frames = read_frames_pyav(clip_path, frame_idxs)
     except Exception as e:
         logger.warning(f"Could not read {clip_path}: {e}")
         return None
@@ -294,8 +310,11 @@ def main(args):
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     clips = list_clips(args.clips_dir, args.clip_list, args.exclude_list)
+    no_tracks_file = args.out_dir / NO_TRACKS_FILE
     if config.skip_if_exists:
         done = {p.name for p in args.out_dir.iterdir() if (p / "tracks_360.pth").exists()}
+        if no_tracks_file.exists():
+            done |= set(no_tracks_file.read_text().split())
         clips = [c for c in clips if c.stem not in done]
     logger.info(f"Running on {len(clips)} clips")
     if not clips:
@@ -327,6 +346,8 @@ def main(args):
                                                                           lang_sam_results, loaded):
             results = process_clip(clip_path.stem, eq_vid_frames, frame_idxs, lang_sam_result, models, config, device)
             if results is None:
+                with open(no_tracks_file, "a") as f:  # So reruns skip it.
+                    f.write(clip_path.stem + "\n")
                 continue
             out_dir = args.out_dir / clip_path.stem
             out_dir.mkdir(parents=True, exist_ok=True)

@@ -29,6 +29,17 @@ git lfs install
 git clone https://huggingface.co/datasets/fhudson96/TAPVid360-10k
 cd TAPVid360-10k
 tar -xvf dataset.tar.gz
+cd ../..
+```
+
+Without git-lfs (e.g. on a shared cluster), download with the Hugging Face CLI instead:
+```
+pip install -U huggingface_hub
+mkdir -p data && cd data
+hf download fhudson96/TAPVid360-10k --repo-type dataset --local-dir TAPVid360-10k
+cd TAPVid360-10k
+tar -xvf dataset.tar.gz
+cd ../..
 ```
 
 ## Evaluation
@@ -52,9 +63,20 @@ Outputs format should be a separate `.pth` file for each video in the dataset. W
 
 Within this file should be a single tensor of shape `(N_frames, N_points, 3)` representing the unit vector (vc) coordinates of each point in each frame. For TAPVid360-10k this should be then of shape `(32, 256, 3)`
 
-These should be stored under `results/` or change `results_dir` in config file
+These should be stored under `results/` or change `results_dir` in config file, and `method_name` in the config file set to the name of the sub-folder of `results/` holding them.
+
+The scripts for the other baselines in the paper (TAPIR, BootsTAPIR, TAPNext, TAPIP3D, SpatialTracker, CoTracker3) are not included. As described in the paper, their pixel tracks were converted to directions using the camera intrinsics, which `Mappers` does:
+
+```python
+from src.tapvid360.common.conversions.mapper import Mappers
+
+# tracks: (32, 256, 2) pixel (x, y) predictions in the 320x240 frames; data = torch.load(<sample>/data.pt)
+mapper = Mappers(320, 240, equirectangular_height=data["equi_h"], fov_x=data["fov_x"])
+directions = mapper.point.ij.to_vc(tracks)  # (32, 256, 3) unit vectors, the format described above
+```
+
 ### Run TAPVid360-10k Evaluation
-Within `src/tapvid360/evaluation/eval_runner.py` there is a flag called `RUN_METRICS` defaulted to `True`, if metrics have been generated this can be set to `False` to just aggregate the metrics.
+Within `src/tapvid360/evaluation/eval_runner.py` there is a flag called `RUN_METRICS` defaulted to `True`, if metrics have been generated this can be set to `False` to just aggregate the metrics. Metrics are reported over the whole dataset and per camera method (as in Table 4 of the paper).
 
 ```
 PYTHONPATH=. python src/tapvid360/evaluation/eval_runner.py 
@@ -87,7 +109,7 @@ PYTHONPATH=. python src/tapvid360/data_generation/download/main.py \
 
 The metadata file is [`360-1M.parquet`](https://huggingface.co/datasets/mwallingford/360-1M/resolve/main/360-1M.parquet) from the [360-1M dataset](https://huggingface.co/datasets/mwallingford/360-1M) (about 1.1M video IDs; only the `id` and `like_count` columns are used).
 
-Clips are written to `outputs/download/<run>/filtered_clips/<video_id>/<video_id>_clip_NNNN.mp4`. Runs can be resumed with `--resume_dir outputs/download/<run>`. Downloads go through `yt-dlp`; pass `--cookies` if YouTube rate-limits you.
+Clips are written to `outputs/download/<run>/filtered_clips/<video_id>/<video_id>_clip_NNNN.mp4`. Most videos are rejected, so expect many `failed coarse filtering: ...` log lines (with the reason) before the first clips appear; `successful` and `filtered_clips_total` in the `Progress` lines count what passed. Decoder messages such as `libav.h264 - ERROR - mmco: unref short failure` and torchvision's `pretrained` deprecation warnings are harmless. Runs can be resumed with `--resume_dir outputs/download/<run>`. Downloads go through `yt-dlp`; pass `--cookies` if YouTube rate-limits you.
 
 ### 2. Track objects across the sphere (`tracks/`)
 For 32 frames of each clip (resized to 2048×1024), Lang-SAM finds candidate moving objects and SAM 2 propagates their masks. CoTracker3 then tracks 256 points per object in an object-centred perspective video, and the tracks are projected back to the sphere. Static, poorly segmented and duplicate objects are dropped; thresholds are in `tracks/config.py`.
@@ -97,7 +119,7 @@ PYTHONPATH=. python src/tapvid360/data_generation/tracks/main.py \
     --clips_dir outputs/download/<run>/filtered_clips --out_dir outputs/tracks_360
 ```
 
-When generating training data, pass `--exclude_list data/TAPVid360-10k` (the dataset root, or a JSON list of sample names such as `"-0r64Y3PCTQ_clip_0000/0"`) so that no TAPVid360-10k clip is reused. As for the released model, only those clips are excluded; other clips of the same videos can still be used. Stage 2 takes about 15 s per clip on an NVIDIA A40.
+When generating training data, pass `--exclude_list data/TAPVid360-10k` (the dataset root, or a JSON list of sample names such as `"-0r64Y3PCTQ_clip_0000/0"`) so that no TAPVid360-10k clip is reused. As for the released model, only those clips are excluded; other clips of the same videos can still be used. Stage 2 takes about 15 s per clip on an NVIDIA A40. Reruns skip finished clips, including those listed in `clips_without_tracks.txt` (no object survived the filters).
 
 ### 3. Manual review (`review/`)
 Every object track in TAPVid360-10k was checked by hand. This tool plays each track on the equirectangular video or in an object-centred view. Press `A` to accept a track or `R` to reject it; decisions are saved to `outputs/tracks_360_manual_checking/`.
@@ -122,6 +144,14 @@ PYTHONPATH=. python src/tapvid360/data_generation/sequences/main.py \
 Samples are written in the same format as the released dataset: `<clip>/<idx>/perspective_frames/*.jpg`, `data.pt` and `gen_info.txt`.
 
 The camera methods in the released TAPVid360-10k are: RANDOM 4165, SPIN_Z 1546, SPIN_X 1469, SPIRAL 1386, PERSPECTIVE_SAMPLER 848, REID 567, SPIN_Y 13 and STATIC 6.
+
+**Names in the paper:** `REID` is *btf* (back-to-front) and `PERSPECTIVE_SAMPLER` is *simulated human*; the other methods have the same names.
+
+**Where the code differs from the paper's description:** the code is what generated TAPVid360-10k, so it is released as is.
+- Motion filter (stage 2): objects are kept or dropped as a whole, by the mean path length of their points, rather than each point's track being filtered by its own path length.
+- Scene-dynamics check (stage 1): the mean absolute difference between evenly spaced frames, rather than pixel variance at random intervals.
+- Top/bottom LPIPS check (stage 1): a match rejects the video; only videos whose metadata says top-and-bottom are cropped.
+- The second-stage Viser checking tool (Appendix A, Fig. 7) is not included.
 
 **Reproducibility:** a new run will not reproduce TAPVid360-10k exactly. YouTube videos get removed or changed, model outputs differ slightly between GPUs and library versions, the manual review is subjective, and the camera trajectories are random.
 
@@ -174,4 +204,4 @@ Defaults: 120 epochs, Adam with lr 1e-4, batch size 6, 32 query points over 32 f
 
 ## License
 
-The code is MIT — see [LICENSE](LICENSE). The [TAPVid360-10k dataset](https://huggingface.co/datasets/fhudson96/TAPVid360-10k) and the [CoTracker360 weights](https://huggingface.co/fhudson96/cotracker360) (derived from CoTracker3) are CC BY-NC 4.0.
+The code is MIT — see [LICENSE](LICENSE) — except `src/tapvid360/common/model/cotracker360.py`, which is modified from [CoTracker](https://github.com/facebookresearch/co-tracker) and so is CC BY-NC 4.0. Parts of `src/tapvid360/data_generation/tracks/` are adapted from [SAM 2](https://github.com/facebookresearch/sam2) and [Lang-SAM](https://github.com/luca-medeiros/lang-segment-anything) (both Apache-2.0). The [TAPVid360-10k dataset](https://huggingface.co/datasets/fhudson96/TAPVid360-10k) and the [CoTracker360 weights](https://huggingface.co/fhudson96/cotracker360) (derived from CoTracker3) are CC BY-NC 4.0.

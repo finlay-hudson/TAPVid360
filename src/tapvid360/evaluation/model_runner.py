@@ -17,8 +17,13 @@ def _make_query_points_for_cotracker(gt_unit_vectors, perspective_points):
     return [torch.cat([torch.zeros_like(init_unit_vector[..., 0:1]), init_unit_vector], dim=-1), init_persp_point]
 
 
+TAPVID360_FOV_X = 75.18  # Horizontal FoV (degrees) of every TAPVid360-10k sample.
+
+
 def _get_tapvid360_mapper(eq_hs, w, h, fov_xs):
-    return [Mappers(w, h, equirectangular_height=eq_h, fov_x=75.18) for eq_h, fov_x in zip(eq_hs, fov_xs)]
+    if fov_xs is None:
+        fov_xs = [TAPVID360_FOV_X] * len(eq_hs)
+    return [Mappers(w, h, equirectangular_height=eq_h, fov_x=float(fov_x)) for eq_h, fov_x in zip(eq_hs, fov_xs)]
 
 
 @torch.no_grad()

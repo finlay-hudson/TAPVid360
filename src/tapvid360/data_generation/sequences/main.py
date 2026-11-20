@@ -14,6 +14,7 @@ import argparse
 import json
 import logging
 import random
+import shutil
 from pathlib import Path
 
 import torch
@@ -55,8 +56,32 @@ def load_accepted_mask(review_dir: Path, clip_name: str) -> torch.Tensor | None:
     if not path.exists():
         return None
     with open(path) as f:
-        statuses = json.load(f)
-    return torch.Tensor([statuses[idx] == ACCEPTED for idx in statuses]).bool()
+        statuses = {int(idx): status for idx, status in json.load(f).items()}
+    return torch.tensor([statuses[idx] == ACCEPTED for idx in sorted(statuses)], dtype=torch.bool)
+
+
+def num_complete_samples(sample_dir: Path) -> int:
+    """Number of fully exported samples (<idx>/gen_info.txt is written last) in a <clip> or <clip>_<method> dir."""
+    return sum(1 for p in sample_dir.glob("*/gen_info.txt")) if sample_dir.is_dir() else 0
+
+
+def is_clip_done(out_dir: Path, clip_name: str, review_dir: Path, training: bool) -> bool:
+    """Whether a previous (possibly interrupted) run fully exported this clip.
+
+    In training mode, a partially exported clip is deleted so it is regenerated with a fresh set of camera methods.
+    """
+    if training:
+        method_dirs = [out_dir / f"{clip_name}_{m.value}" for m in TRAINING_METHODS
+                       if (out_dir / f"{clip_name}_{m.value}").is_dir()]
+        counts = {num_complete_samples(d) for d in method_dirs}
+        if len(method_dirs) == TRAINING_METHODS_PER_TRACK and len(counts) == 1 and counts.pop() > 0:
+            return True
+        for d in method_dirs:
+            shutil.rmtree(d)
+        return False
+    accepted = load_accepted_mask(review_dir, clip_name)
+    n_done = num_complete_samples(out_dir / clip_name)
+    return n_done > 0 and (accepted is None or n_done == int(accepted.sum()))
 
 
 def render_sequences(data: dict, eq_frames: torch.Tensor, mapper: Mappers, method: RotationMethods | None,
@@ -102,9 +127,7 @@ def main(args):
         logger.info(f"{tracks_dir}: {len(clip_names)} clips")
 
         for clip_name in tqdm(clip_names):
-            already_done = (any(args.out_dir.glob(f"{clip_name}_*/0/data.pt")) if training
-                            else (args.out_dir / clip_name / "0" / "data.pt").exists())
-            if already_done:
+            if is_clip_done(args.out_dir, clip_name, review_dir, training):
                 continue
             tracks_path = tracks_dir / clip_name / "tracks_360.pth"
             frames_path = tracks_dir / clip_name / f"frames_{config.max_frames}.pth"
