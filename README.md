@@ -58,6 +58,8 @@ Put checkpoint in `checkpoints/` or change `trained_model_path` in config file
 PYTHONPATH=. python src/tapvid360/evaluation/model_runner.py 
 ```
 
+With the released weights this reproduces the CoTracker360 results in Tables 3 and 4 of the paper (e.g. 0.2386 accuracy and 8.27° mean angular error over all points), up to small floating-point differences between GPUs and library versions.
+
 ### If running through a separate model 
 Outputs format should be a separate `.pth` file for each video in the dataset. With the `/` changed to a `-`. I.e `-0r64Y3PCTQ_clip_0000-0.pth`
 
