@@ -67,15 +67,26 @@ def train_one_epoch(model, loader, optimizer, device, num_iters, epoch):
 
 @torch.no_grad()
 def validate(model, loader, device, num_iters, epoch):
-    """Angular error (degrees) of every point and frame of the validation set."""
+    """Mean angular error (degrees) of each validation sample, shape (S, 1, 1).
+
+    Only per-sample means are kept (not every point and frame), so checkpoints, which store the validation history,
+    stay small. Every sample has the same number of frames and points, so their mean is the overall mean.
+    """
     model.eval()
-    dists = []
+    sample_means = []
     progress = tqdm(loader, desc=f"Epoch {epoch} [val]")
     for batch in progress:
         coord_preds, _ = forward(model, batch, device, num_iters)
-        dists.append(calc_angular_dist(coord_preds, batch.trajectory).cpu())
-        progress.set_postfix(mean_dist=f"{torch.cat(dists).mean():.4f}")
-    return torch.cat(dists)
+        sample_means.append(calc_angular_dist(coord_preds, batch.trajectory).mean(dim=(1, 2)).cpu())
+        progress.set_postfix(mean_dist=f"{torch.cat(sample_means).mean():.4f}")
+    return torch.cat(sample_means)[:, None, None]
+
+
+def compact_val_history(dists: dict) -> dict:
+    """Reduce full (S, T, N) validation entries from older checkpoints to per-sample means (S, 1, 1)."""
+    dists["val"] = {epoch: d if d.shape[1:] == (1, 1) else d.mean(dim=(1, 2), keepdim=True)
+                    for epoch, d in dists["val"].items()}
+    return dists
 
 
 def main(args):
@@ -107,7 +118,7 @@ def main(args):
     if args.resume:
         checkpoint = checkpointer.load("checkpoint_last.pth")
         model.load_weights(args.out_dir / "checkpoint_last.pth", strict=True)
-        losses, dists = checkpoint["extras"]["losses"], checkpoint["extras"]["dists"]
+        losses, dists = checkpoint["extras"]["losses"], compact_val_history(checkpoint["extras"]["dists"])
         start_epoch = checkpoint["epoch"] + 1
         # So the first save after resuming only replaces checkpoint_best.pth if the new epoch is better.
         val_epochs = list(dists["val"].keys())
