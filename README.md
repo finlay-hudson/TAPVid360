@@ -8,6 +8,8 @@
 
 Given a narrow field-of-view video and query points in the first frame, TAPVid-360 asks for the 3D direction to each point in every frame, even after it leaves the camera's view. This repository contains the TAPVid360-10k evaluation code, the CoTracker360 baseline, and the code used to generate the dataset and train CoTracker360.
 
+## News
+**26 Nov 2026: in-frame labels corrected in TAPVid360-10k v1.1.** We found a bug in the in-frame / out-of-frame labels of TAPVid360-10k v1.0, the version used in the paper. Points behind the camera could be labelled in frame. This affected 10.8% of the in-frame labels. v1.1 fixes the labels and changes nothing else in the dataset. Results over all points are unchanged. With the corrected labels, every method scores better in frame and worse out of frame. CoTracker360 is still clearly the best method out of frame. See [Dataset versions](#dataset-versions) for the cause and the corrected Tables 2–4. v1.0 remains available.
 
 ## Setup
 Create a virtual environment (Python 3.10 or newer) and install the dependencies:
@@ -42,6 +44,51 @@ tar -xvf dataset.tar.gz
 cd ../..
 ```
 
+### Dataset versions
+- **v1.1 (current):** corrected in-frame labels (`coords_visibility`).
+- **v1.0:** the version used in the paper. Download it with `--revision v1.0` (`hf download`) or `git checkout v1.0` (git clone).
+
+In v1.0, points *behind* the camera could be labelled in frame, because their projection to pixels can also land inside the image. This affected 3.94M (10.8%) of the point labels marked in frame, mostly in the `SPIN_X` and `SPIN_Z` camera methods. v1.1 changes only `coords_visibility`. The videos, ground-truth directions (`coords`) and rotations are identical, so results over all points are unchanged.
+
+To update a v1.0 copy yourself, apply this to each sample's `data.pt`:
+```python
+d["coords_visibility"] = d["coords_visibility"] & (d["coords"][..., 0] > 0)
+```
+
+#### What changed from v1.0 to v1.1
+In the tables below, IF means in frame and OOF out of frame. Each cell gives the v1.0 → v1.1 value. A single value means the metric did not change. The "all" columns never change, because they don't use the labels.
+
+**Table 2 (points):** in frame 36.28M → 32.34M, out of frame 45.64M → 49.58M.
+
+**Table 3:**
+
+| Method | < δ all ↑ | < δ IF ↑ | < δ OOF ↑ | AD all ↓ | AD IF ↓ | AD OOF ↓ |
+|---|---|---|---|---|---|---|
+| TAPNext | 0.0083 | 0.0194 → 0.0219 | 0.0005 → 0.0004 | 51.75 | 36.49 → 23.44 | 62.14 → 66.78 |
+| TAPIR | 0.0106 | 0.0251 → 0.0282 | 0.0003 | 49.81 | 33.88 → 19.90 | 60.52 → 65.82 |
+| BootsTAPIR | 0.0120 | 0.0280 → 0.0314 | 0.0005 | 48.09 | 33.20 → 19.55 | 57.99 → 63.27 |
+| TAPIP3D* | 0.2477 | 0.4726 → 0.5335 | 0.0831 → 0.0820 | 36.21 | 23.01 → 10.82 | 45.60 → 49.38 |
+| SpatialTracker | 0.2239 | 0.4893 → 0.5583 | 0.0303 → 0.0295 | 38.88 | 22.16 → 8.34 | 50.43 → 54.72 |
+| CoTracker3 (offline)* | 0.2405 | 0.5546 → 0.6291 | 0.0152 → 0.0144 | 37.71 | 17.81 → 3.53 | 51.29 → 55.82 |
+| CoTracker360 | 0.2386 | 0.4060 → 0.4616 | 0.1160 → 0.1123 | 8.27 | 3.95 → 2.93 | 10.98 → 11.17 |
+
+**Table 4 (CoTracker360 by camera method):** in the paper, `REID` is called *btf* and `PERSPECTIVE_SAMPLER` *simulated human*.
+
+| Camera method | Samples | < δ IF ↑ | < δ OOF ↑ | AD IF ↓ | AD OOF ↓ |
+|---|---|---|---|---|---|
+| `SPIN_X` | 1469 | 0.4537 → 0.6266 | 0.1255 → 0.1158 | 3.92 → 1.55 | 7.84 → 8.12 |
+| `SPIN_Z` | 1546 | 0.4255 → 0.5998 | 0.1379 → 0.1244 | 4.40 → 1.85 | 7.62 → 8.08 |
+| `PERSPECTIVE_SAMPLER` | 848 | 0.4441 → 0.4762 | 0.0849 → 0.0822 | 3.90 → 2.26 | 12.20 → 12.84 |
+| `RANDOM` | 4165 | 0.3300 → 0.3311 | 0.0671 | 4.39 → 4.09 | 14.40 → 14.44 |
+| `REID` | 567 | 0.4128 → 0.4129 | 0.0568 | 4.09 → 4.07 | 15.13 → 15.14 |
+| `SPIRAL` | 1386 | 0.5367 → 0.5373 | 0.2733 | 2.09 → 1.98 | 4.94 → 4.96 |
+| `SPIN_Y` | 13 | 0.3412 | 0.0035 | 7.39 | 49.23 |
+| `STATIC` | 6 | 0.3212 | 0.0207 | 5.13 | 24.10 |
+
+The v1.0 values were rescored with this repository's evaluation code, using the paper's saved predictions. The TAPIR, BootsTAPIR and TAPNext predictions had not been kept, so those three were re-run. These v1.0 values match the paper's Table 3 to within 0.003 accuracy and 0.3°. CoTracker360 matches Tables 3 and 4 exactly. \*TAPIP3D was scored over 1,279 samples and CoTracker3 over 8,137, the samples with saved predictions.
+
+The paper's conclusions do not change: CoTracker360 is still clearly the best method out of frame. In frame, the baselines' errors are much smaller than v1.0 suggested. For example, CoTracker3's in-frame AD drops from 17.81° to 3.53°.
+
 ## Evaluation
 
 ### Configs
@@ -58,7 +105,7 @@ Put checkpoint in `checkpoints/` or change `trained_model_path` in config file
 PYTHONPATH=. python src/tapvid360/evaluation/model_runner.py 
 ```
 
-With the released weights this reproduces the CoTracker360 results in Tables 3 and 4 of the paper (e.g. 0.2386 accuracy and 8.27° mean angular error over all points), up to small floating-point differences between GPUs and library versions.
+With the released weights and dataset v1.0, this reproduces the CoTracker360 results in Tables 3 and 4 of the paper (e.g. 0.2386 accuracy and 8.27° mean angular error over all points), up to small floating-point differences between GPUs and library versions. With v1.1, the in-frame and out-of-frame results differ (see [Dataset versions](#dataset-versions)).
 
 ### If running through a separate model 
 Outputs format should be a separate `.pth` file for each video in the dataset. With the `/` changed to a `-`. I.e `-0r64Y3PCTQ_clip_0000-0.pth`
