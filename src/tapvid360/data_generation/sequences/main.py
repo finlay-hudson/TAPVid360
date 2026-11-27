@@ -40,10 +40,15 @@ TRAINING_METHOD_WEIGHTS = [0.05, 0.05, 0.05, 0.3, 0.25, 0.05, 0.1, 0.15]
 TRAINING_METHODS_PER_TRACK = 5
 
 
-def are_points_in_frame(points: torch.Tensor, frame_w: int, frame_h: int) -> torch.Tensor:
-    """Whether each (x, y) point lies inside a frame_w x frame_h image."""
+def are_points_in_frame(vc: torch.Tensor, points: torch.Tensor, frame_w: int, frame_h: int) -> torch.Tensor:
+    """Whether each point is in front of the camera (vc x > 0) and its projection (x, y) lies inside a
+    frame_w x frame_h image.
+
+    The in-front check is needed because projecting a direction behind the camera to pixels can also land inside the
+    image. TAPVid360-10k v1.0 was generated without it (see the README).
+    """
     x, y = points[..., 0], points[..., 1]
-    return (x >= 0) & (x < frame_w) & (y >= 0) & (y < frame_h)
+    return (vc[..., 0] > 0) & (x >= 0) & (x < frame_w) & (y >= 0) & (y < frame_h)
 
 
 def review_file(review_dir: Path, clip_name: str) -> Path:
@@ -100,8 +105,9 @@ def render_sequences(data: dict, eq_frames: torch.Tensor, mapper: Mappers, metho
         "new_persp_imgs": torch.stack(new_persp_imgs),
         "new_rot_mats": new_rot_mats,
         "new_persp_coords": new_vc,
-        # Visibility = inside the narrow-FoV frame (occlusion is not used).
-        "new_persp_coords_vis": are_points_in_frame(new_persp_points, config.crop_width, config.crop_height),
+        # Visibility = in front of the camera and inside the narrow-FoV frame (occlusion is not used).
+        "new_persp_coords_vis": are_points_in_frame(new_vc, new_persp_points, config.crop_width,
+                                                    config.crop_height),
         "methods": [m.name for m in methods],
         "fov_x": config.fov_x,
         "eq_frames_h": data["eq_img_h"],
